@@ -2046,15 +2046,25 @@ function saveLibraryToLocal() {
 }
 
 function exportLibraryDataCode() {
-    const code = btoa(unescape(encodeURIComponent(JSON.stringify(libraryData.characters))));
-    const modal = document.getElementById('share-code-modal');
-    document.getElementById('share-code-output').value = code;
-    document.getElementById('share-code-title').innerText = '📤 題庫同步代碼';
-    modal.style.display = 'flex';
+    try {
+        const jsonStr = JSON.stringify(libraryData.characters);
+        const uint8array = new TextEncoder().encode(jsonStr);
+        let binary = "";
+        uint8array.forEach(b => {
+            binary += String.fromCharCode(b);
+        });
+        const code = btoa(binary);
+        
+        const modal = document.getElementById('share-code-modal');
+        document.getElementById('share-code-output').value = code;
+        document.getElementById('share-code-title').innerText = '📤 題庫同步代碼';
+        modal.style.display = 'flex';
+    } catch(e) {
+        alert('匯出失敗：' + e.message);
+    }
 }
 
 function importLibraryDataCodePrompt() {
-    // Open the new textarea-based modal instead of using prompt()
     document.getElementById('library-import-input').value = '';
     document.getElementById('library-import-modal').style.display = 'flex';
 }
@@ -2066,21 +2076,30 @@ function processLibraryImport() {
         return;
     }
 
-    // Remove any spaces, newlines or carriage returns that might have been added during copy-paste
     code = code.replace(/\s/g, '');
 
     try {
-        let decoded;
+        let binary;
         try {
-            decoded = atob(code);
+            binary = atob(code);
         } catch(b64err) {
-            throw new Error('代碼格式錯誤 (Base64 解析失敗)，請確認代碼是否複製完整，沒有遺漏最後的字符。');
+            throw new Error('代碼格式錯誤 (Base64 解析失敗)，請確認代碼是否複製完整。');
+        }
+
+        let jsonStr;
+        try {
+            const uint8array = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                uint8array[i] = binary.charCodeAt(i);
+            }
+            jsonStr = new TextDecoder().decode(uint8array);
+        } catch(decodeErr) {
+            throw new Error('文字解碼失敗 (Unicode Decoding Error)。');
         }
 
         let chars;
         try {
-            // Standard UTF-8 decoding hack
-            chars = JSON.parse(decodeURIComponent(escape(decoded)));
+            chars = JSON.parse(jsonStr);
         } catch(jsonErr) {
             throw new Error('代碼內容損毀 (JSON 解析失敗)。');
         }
@@ -2089,13 +2108,11 @@ function processLibraryImport() {
             throw new Error('無效的題庫格式。');
         }
         
-        // Final sanity check - does it look like our characters object?
         const sampleKey = Object.keys(chars)[0];
         if (sampleKey && (!chars[sampleKey].zhuyin && !chars[sampleKey].definition)) {
              throw new Error('代碼內容似乎不是有效的題庫資料。');
         }
 
-        // Apply changes
         libraryData.characters = { ...libraryData.characters, ...chars };
         localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
         
