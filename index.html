@@ -2060,25 +2060,50 @@ function importLibraryDataCodePrompt() {
 }
 
 function processLibraryImport() {
-    const code = document.getElementById('library-import-input').value.trim();
+    let code = document.getElementById('library-import-input').value.trim();
     if (!code) {
         alert('請先貼入題庫代碼！');
         return;
     }
+
+    // Remove any spaces, newlines or carriage returns that might have been added during copy-paste
+    code = code.replace(/\s/g, '');
+
     try {
-        const decoded = atob(code);
-        const chars = JSON.parse(decodeURIComponent(escape(decoded)));
-        if (typeof chars !== 'object') throw new Error();
+        let decoded;
+        try {
+            decoded = atob(code);
+        } catch(b64err) {
+            throw new Error('代碼格式錯誤 (Base64 解析失敗)，請確認代碼是否複製完整，沒有遺漏最後的字符。');
+        }
+
+        let chars;
+        try {
+            // Standard UTF-8 decoding hack
+            chars = JSON.parse(decodeURIComponent(escape(decoded)));
+        } catch(jsonErr) {
+            throw new Error('代碼內容損毀 (JSON 解析失敗)。');
+        }
+
+        if (!chars || typeof chars !== 'object') {
+            throw new Error('無效的題庫格式。');
+        }
         
-        // Save to custom library
+        // Final sanity check - does it look like our characters object?
+        const sampleKey = Object.keys(chars)[0];
+        if (sampleKey && (!chars[sampleKey].zhuyin && !chars[sampleKey].definition)) {
+             throw new Error('代碼內容似乎不是有效的題庫資料。');
+        }
+
+        // Apply changes
         libraryData.characters = { ...libraryData.characters, ...chars };
         localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
         
-        alert('✅ 題庫匯入成功！頁面將重新整理以套用變更。');
+        alert('✅ 題庫匯入成功！系統已更新。頁面將重新整理。');
         location.reload();
     } catch(e) {
         console.error('Import Error:', e);
-        alert('❌ 錯誤：無法解析此代碼。請確認代碼是否複製完整。');
+        alert('❌ 匯入失敗：\n' + e.message);
     }
 }
 
