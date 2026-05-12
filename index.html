@@ -515,6 +515,17 @@
         </div>
     </div>
 
+    <!-- Library Import Modal -->
+    <div class="modal-overlay" id="library-import-modal" style="display:none;">
+        <div class="modal-content" style="max-width: 500px; text-align: center;">
+            <span class="close-btn" onclick="document.getElementById('library-import-modal').style.display='none'">×</span>
+            <h2 style="color: var(--text-gold); margin-bottom: 1rem;">📥 匯入題庫代碼</h2>
+            <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem;">請將另一台裝置產出的「題庫同步代碼」貼在下方：</p>
+            <textarea id="library-import-input" rows="8" style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid var(--accent-blue); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; resize: vertical;" placeholder="請在此貼上代碼..."></textarea>
+            <button class="btn" onclick="processLibraryImport()" style="margin-top: 1rem; background: var(--accent-blue); color: white;">🚀 開始匯入</button>
+        </div>
+    </div>
+
     <!-- Device Switcher (New in 2.1) -->
     <div class="device-switcher">
         <button class="device-btn" id="btn-device-mobile" onclick="setDeviceMode('mobile')" title="手機模式">📱</button>
@@ -2035,9 +2046,6 @@ function saveLibraryToLocal() {
 }
 
 function exportLibraryDataCode() {
-    const customOnly = {};
-    // Only export characters that are modified or added
-    // For simplicity, let's just export all characters currently in memory
     const code = btoa(unescape(encodeURIComponent(JSON.stringify(libraryData.characters))));
     const modal = document.getElementById('share-code-modal');
     document.getElementById('share-code-output').value = code;
@@ -2046,19 +2054,31 @@ function exportLibraryDataCode() {
 }
 
 function importLibraryDataCodePrompt() {
-    const code = prompt("請貼入由另一台裝置匯出的「題庫同步代碼」：");
-    if (!code) return;
+    // Open the new textarea-based modal instead of using prompt()
+    document.getElementById('library-import-input').value = '';
+    document.getElementById('library-import-modal').style.display = 'flex';
+}
+
+function processLibraryImport() {
+    const code = document.getElementById('library-import-input').value.trim();
+    if (!code) {
+        alert('請先貼入題庫代碼！');
+        return;
+    }
     try {
-        const chars = JSON.parse(decodeURIComponent(escape(atob(code))));
+        const decoded = atob(code);
+        const chars = JSON.parse(decodeURIComponent(escape(decoded)));
         if (typeof chars !== 'object') throw new Error();
         
-        // Merge or replace? Let's merge.
+        // Save to custom library
         libraryData.characters = { ...libraryData.characters, ...chars };
         localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
+        
         alert('✅ 題庫匯入成功！頁面將重新整理以套用變更。');
         location.reload();
     } catch(e) {
-        alert('❌ 錯誤：無效的題庫代碼，請重新確認。');
+        console.error('Import Error:', e);
+        alert('❌ 錯誤：無法解析此代碼。請確認代碼是否複製完整。');
     }
 }
 
