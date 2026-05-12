@@ -220,8 +220,9 @@
                         <input type="text" id="libSearchInput" placeholder="搜尋漢字..." oninput="renderLibraryManager()"
                                style="flex-grow: 1; padding: 12px; border-radius: 8px; background: #334155; color: white; border: 1px solid var(--text-gold);">
                         <button class="btn" onclick="openEditModal(null)">✨ 新增生字</button>
-                        <button class="btn btn-secondary" onclick="exportLibraryDataCode()">📤 匯出題庫代碼</button>
-                        <button class="btn btn-secondary" onclick="importLibraryDataCodePrompt()">📥 匯入題庫代碼</button>
+                        <button class="btn btn-secondary" onclick="exportLibraryDataCode()">📤 產生同步代碼</button>
+                        <button class="btn btn-secondary" onclick="exportLibraryData()">💾 下載題庫檔案</button>
+                        <button class="btn btn-secondary" onclick="importLibraryDataCodePrompt()">📥 匯入題庫資料</button>
                     </div>
                     <div class="library-manager-grid" id="library-manager-list">
                         <!-- Characters list for editor -->
@@ -517,12 +518,22 @@
 
     <!-- Library Import Modal -->
     <div class="modal-overlay" id="library-import-modal" style="display:none;">
-        <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <div class="modal-content" style="max-width: 550px; text-align: center;">
             <span class="close-btn" onclick="document.getElementById('library-import-modal').style.display='none'">×</span>
-            <h2 style="color: var(--text-gold); margin-bottom: 1rem;">📥 匯入題庫代碼</h2>
-            <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem;">請將另一台裝置產出的「題庫同步代碼」貼在下方：</p>
-            <textarea id="library-import-input" rows="8" style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid var(--accent-blue); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; resize: vertical;" placeholder="請在此貼上代碼..."></textarea>
-            <button class="btn" onclick="processLibraryImport()" style="margin-top: 1rem; background: var(--accent-blue); color: white;">🚀 開始匯入</button>
+            <h2 style="color: var(--text-gold); margin-bottom: 1rem;">📥 匯入題庫資料</h2>
+            
+            <div style="background: rgba(59, 130, 246, 0.1); padding: 1.5rem; border-radius: 12px; border: 1px dashed var(--accent-blue); margin-bottom: 1.5rem;">
+                <p style="margin-bottom: 1rem; font-weight: bold;">方法 A：上傳題庫檔案 (最穩定)</p>
+                <input type="file" id="library-file-input" accept=".json,.js" style="margin-bottom: 1rem; color: #94a3b8;">
+                <br>
+                <button class="btn" onclick="processLibraryFileImport()" style="background: var(--accent-blue); color: white;">📁 匯入檔案</button>
+            </div>
+
+            <div style="border-top: 1px solid #334155; padding-top: 1.5rem;">
+                <p style="margin-bottom: 1rem; font-weight: bold;">方法 B：貼入同步代碼 (適合少量文字)</p>
+                <textarea id="library-import-input" rows="5" style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; resize: vertical;" placeholder="請在此貼上代碼..."></textarea>
+                <button class="btn" onclick="processLibraryImport()" style="margin-top: 1rem; background: #334155; color: white;">🚀 貼上代碼匯入</button>
+            </div>
         </div>
     </div>
 
@@ -2124,15 +2135,51 @@ function processLibraryImport() {
     }
 }
 
+function processLibraryFileImport() {
+    const fileInput = document.getElementById('library-file-input');
+    if (!fileInput.files.length) {
+        alert('請先選擇檔案！');
+        return;
+    }
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        let content = e.target.result;
+        try {
+            // If it's the old .js format, try to extract the JSON
+            if (content.includes('const updatedCharacters =')) {
+                content = content.replace('const updatedCharacters =', '').replace(/;$/, '').trim();
+            }
+            const chars = JSON.parse(content);
+            applyImportedLibrary(chars);
+        } catch(err) {
+            alert('❌ 檔案格式錯誤，無法解析 JSON。');
+        }
+    };
+    reader.readAsText(file);
+}
+
+function applyImportedLibrary(chars) {
+    if (!chars || typeof chars !== 'object') {
+        alert('❌ 無效的題庫格式。');
+        return;
+    }
+    libraryData.characters = { ...libraryData.characters, ...chars };
+    localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
+    alert('✅ 題庫匯入成功！系統已更新。頁面將重新整理。');
+    location.reload();
+}
+
 function exportLibraryData() {
-    // Keep the old file export as a backup option
-    const code = `const updatedCharacters = ${JSON.stringify(libraryData.characters, null, 2)};`;
-    const blob = new Blob([code], { type: 'text/javascript' });
+    // Export as pure JSON for easier importing
+    const jsonStr = JSON.stringify(libraryData.characters, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'updated_characters_data.js';
+    a.download = 'zi_part_quest_library.json';
     a.click();
+    alert('✅ 題庫檔案已下載。您可以在另一台裝置上使用「匯入檔案」功能來同步。');
 }
 
 // Island & Atmosphere Logic ... (unchanged)
