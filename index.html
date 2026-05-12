@@ -220,7 +220,8 @@
                         <input type="text" id="libSearchInput" placeholder="搜尋漢字..." oninput="renderLibraryManager()"
                                style="flex-grow: 1; padding: 12px; border-radius: 8px; background: #334155; color: white; border: 1px solid var(--text-gold);">
                         <button class="btn" onclick="openEditModal(null)">✨ 新增生字</button>
-                        <button class="btn btn-secondary" onclick="exportLibraryData()">💾 匯出資料代碼</button>
+                        <button class="btn btn-secondary" onclick="exportLibraryDataCode()">📤 匯出題庫代碼</button>
+                        <button class="btn btn-secondary" onclick="importLibraryDataCodePrompt()">📥 匯入題庫代碼</button>
                     </div>
                     <div class="library-manager-grid" id="library-manager-list">
                         <!-- Characters list for editor -->
@@ -507,7 +508,7 @@
     <div class="modal-overlay" id="share-code-modal" style="display:none;">
         <div class="modal-content" style="max-width: 500px; text-align: center;">
             <span class="close-btn" onclick="document.getElementById('share-code-modal').style.display='none'">×</span>
-            <h2 style="color: var(--text-gold); margin-bottom: 1rem;">📤 我的進度代碼</h2>
+            <h2 id="share-code-title" style="color: var(--text-gold); margin-bottom: 1rem;">📤 我的進度代碼</h2>
             <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.9rem;">複製這串代碼，交給老師或在另一台裝置上使用！</p>
             <textarea id="share-code-output" rows="4" style="width: 100%; background: #0f172a; color: #e2e8f0; border: 1px solid var(--text-gold); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 0.75rem; resize: none;" readonly></textarea>
             <button id="share-code-copy-btn" class="btn" onclick="copyShareCode()" style="margin-top: 1rem;">📋 複製代碼</button>
@@ -2033,7 +2034,36 @@ function saveLibraryToLocal() {
     localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
 }
 
+function exportLibraryDataCode() {
+    const customOnly = {};
+    // Only export characters that are modified or added
+    // For simplicity, let's just export all characters currently in memory
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(libraryData.characters))));
+    const modal = document.getElementById('share-code-modal');
+    document.getElementById('share-code-output').value = code;
+    document.getElementById('share-code-title').innerText = '📤 題庫同步代碼';
+    modal.style.display = 'flex';
+}
+
+function importLibraryDataCodePrompt() {
+    const code = prompt("請貼入由另一台裝置匯出的「題庫同步代碼」：");
+    if (!code) return;
+    try {
+        const chars = JSON.parse(decodeURIComponent(escape(atob(code))));
+        if (typeof chars !== 'object') throw new Error();
+        
+        // Merge or replace? Let's merge.
+        libraryData.characters = { ...libraryData.characters, ...chars };
+        localStorage.setItem(CUSTOM_LIB_KEY, JSON.stringify(libraryData.characters));
+        alert('✅ 題庫匯入成功！頁面將重新整理以套用變更。');
+        location.reload();
+    } catch(e) {
+        alert('❌ 錯誤：無效的題庫代碼，請重新確認。');
+    }
+}
+
 function exportLibraryData() {
+    // Keep the old file export as a backup option
     const code = `const updatedCharacters = ${JSON.stringify(libraryData.characters, null, 2)};`;
     const blob = new Blob([code], { type: 'text/javascript' });
     const url = URL.createObjectURL(blob);
@@ -2041,7 +2071,6 @@ function exportLibraryData() {
     a.href = url;
     a.download = 'updated_characters_data.js';
     a.click();
-    alert('已產出更新代碼檔案。您可以下載後將內容貼入 data.js 的 characters 部分。');
 }
 
 // Island & Atmosphere Logic ... (unchanged)
